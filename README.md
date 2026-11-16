@@ -57,11 +57,14 @@ pip install -r requirements.txt
 python tune.py --algo PPO --trials 16 --steps 120000
 python tune.py --algo DQN --trials 12 --steps 120000
 
-# 2. train 5 seeds of each agent
+# 2. train 5 seeds of each agent (plus 3 seeds of DQN with untuned defaults)
 for s in 0 1 2 3 4; do
-  python train.py --algo PPO --steps 300000 --seed $s --config tuning/best_PPO.json
-  python train.py --algo DQN --steps 300000 --seed $s --config tuning/best_DQN.json
+  python train.py --algo PPO --steps 200000 --seed $s --config tuning/best_PPO.json
+  python train.py --algo DQN --steps 200000 --seed $s --config tuning/best_DQN.json
   python qlearning.py --episodes 20000 --seed $s
+done
+for s in 0 1 2; do   # untuned DQN, to measure the effect of tuning
+  python train.py --algo DQN --steps 200000 --seed $s --name DQN-default
 done
 
 # 3. evaluate everything on the test patients and make figures

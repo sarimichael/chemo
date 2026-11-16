@@ -109,8 +109,9 @@ fig.tight_layout()
 fig.savefig("figures/trajectories.png", dpi=130)
 
 # ---------- Figure 3: learning curves (return vs env steps, mean ± std over seeds) ----------
-def curve_sb3(logdir):
-    dfs = [pd.read_csv(f, skiprows=1) for f in glob.glob(f"{logdir}/*.monitor.csv")]
+def curve_sb3(path):  # a monitor file (DQN) or a directory of monitor files (PPO, 8 envs)
+    files = [path] if path.endswith(".monitor.csv") else glob.glob(f"{path}/*.monitor.csv")
+    dfs = [pd.read_csv(f, skiprows=1) for f in files]
     df = pd.concat(dfs).sort_values("t")
     return df["l"].cumsum().values, df["r"].values
 
@@ -123,7 +124,8 @@ def curve_ql(csv):
 grid = defaultdict(list)
 for d in sorted(glob.glob(f"logs/*_var{VAR}_s*")):
     label = re.match(rf".*/(.+)_var{VAR}_s\d+", d).group(1)
-    steps, ret = curve_ql(d) if d.endswith(".csv") else curve_sb3(d)
+    is_ql = d.endswith(".csv") and not d.endswith(".monitor.csv")
+    steps, ret = curve_ql(d) if is_ql else curve_sb3(d)
     grid[label].append((steps, ret))
 
 fig, ax = plt.subplots(figsize=(8, 4.5))

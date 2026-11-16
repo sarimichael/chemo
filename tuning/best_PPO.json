@@ -1,0 +1,10 @@
+{
+  "learning_rate": 0.0014176357932643435,
+  "gamma": 0.99,
+  "net": "medium",
+  "n_steps": 256,
+  "batch_size": 64,
+  "ent_coef": 0.01579984178529475,
+  "clip_range": 0.2,
+  "n_epochs": 10
+}
