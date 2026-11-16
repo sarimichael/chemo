@@ -17,6 +17,7 @@ import torch
 from agents import make_model
 from baselines import run_policy
 from chemo_env import ChemoEnv
+from experiments import EXPERIMENTS
 
 torch.set_num_threads(1)
 VAL_SEED0, N_VAL = 5_000, 50
@@ -25,7 +26,7 @@ p = argparse.ArgumentParser()
 p.add_argument("--algo", choices=["PPO", "DQN"], required=True)
 p.add_argument("--trials", type=int, default=16)
 p.add_argument("--steps", type=int, default=100_000)
-p.add_argument("--var", type=float, default=0.2)
+p.add_argument("--exp", choices=list(EXPERIMENTS), default="E1")
 args = p.parse_args()
 
 
@@ -52,9 +53,9 @@ def sample(trial):
 
 def objective(trial):
     cfg = sample(trial)
-    model = make_model(args.algo, cfg, seed=trial.number, env_kwargs=dict(patient_variability=args.var))
+    model = make_model(args.algo, cfg, seed=trial.number, env_kwargs=EXPERIMENTS[args.exp])
     model.learn(total_timesteps=args.steps)
-    env = ChemoEnv(patient_variability=args.var)
+    env = ChemoEnv(**EXPERIMENTS[args.exp])
     runs = [run_policy(env, None, seed=VAL_SEED0 + i, sb3_model=model) for i in range(N_VAL)]
     trial.set_user_attr("cure_rate", float(np.mean([r["outcome"] == "cure" for r in runs])))
     trial.set_user_attr("tox_rate", float(np.mean([r["outcome"] == "toxicity" for r in runs])))

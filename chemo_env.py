@@ -13,6 +13,14 @@ Model (all quantities normalized):
 The agent picks a daily dose u from a discrete set. The episode ends when
 the tumor is eradicated (cure), normal cells fall below a toxicity threshold
 (treatment failure), or the horizon is reached.
+
+Two observation modes:
+  * full (default):  [log10(T)/3, N, C, t/H]  -- the true state
+  * partial (scan_every > 1 or hide_drug=True), closer to the clinic:
+        [last scanned log10(T)/3, measured N, days since scan / scan_every, t/H, previous dose]
+    The tumor is only imaged every `scan_every` days, with Gaussian noise of
+    `scan_noise` on log10(T); healthy cells come from a daily blood test with
+    noise `blood_noise`; the drug concentration C is not observed.
 """
 import numpy as np
 import gymnasium as gym
@@ -43,6 +51,10 @@ class ChemoEnv(gym.Env):
         patient_variability=0.0,  # e.g. 0.2 -> each parameter scaled by U(0.8, 1.2)
         substeps=20,
         params=None,
+        scan_every=1,
+        scan_noise=0.0,
+        blood_noise=0.0,
+        hide_drug=False,
     ):
         super().__init__()
         self.doses = np.asarray(doses, dtype=np.float64)
@@ -56,13 +68,24 @@ class ChemoEnv(gym.Env):
         self.var = patient_variability
         self.substeps = substeps
         self.base_params = dict(DEFAULT_PARAMS if params is None else params)
+        self.scan_every = scan_every
+        self.scan_noise = scan_noise
+        self.blood_noise = blood_noise
+        self.partial = scan_every > 1 or hide_drug
 
         self.action_space = spaces.Discrete(len(self.doses))
-        # obs: [log10(T) scaled, N, C, time fraction]
-        self.observation_space = spaces.Box(
-            low=np.array([-1.5, 0.0, 0.0, 0.0], dtype=np.float32),
-            high=np.array([0.5, 1.0, 5.0, 1.0], dtype=np.float32),
-        )
+        if self.partial:
+            # obs: [scanned log10(T) scaled, measured N, days since scan, time fraction, previous dose]
+            self.observation_space = spaces.Box(
+                low=np.array([-2.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float32),
+                high=np.array([1.0, 1.2, 1.0, 1.0, 1.0], dtype=np.float32),
+            )
+        else:
+            # obs: [log10(T) scaled, N, C, time fraction]
+            self.observation_space = spaces.Box(
+                low=np.array([-1.5, 0.0, 0.0, 0.0], dtype=np.float32),
+                high=np.array([0.5, 1.0, 5.0, 1.0], dtype=np.float32),
+            )
 
     # ---------- dynamics ----------
     def _deriv(self, y, u):
@@ -86,10 +109,26 @@ class ChemoEnv(gym.Env):
             y[0] = max(y[0], 1e-12)
         self.state = y
 
+    def _scan(self):
+        noise = self.np_random.normal(0, self.scan_noise) if self.scan_noise > 0 else 0.0
+        self.scanned_logT = np.log10(max(self.state[0], 1e-12)) + noise
+        self.last_scan = self.t
+
     def _obs(self):
         T, N, C = self.state
-        logT = np.log10(max(T, 1e-12)) / 3.0  # cure level 1e-3 -> -1
-        return np.array([logT, N, C, self.t / self.horizon], dtype=np.float32)
+        if not self.partial:
+            logT = np.log10(max(T, 1e-12)) / 3.0  # cure level 1e-3 -> -1
+            return np.array([logT, N, C, self.t / self.horizon], dtype=np.float32)
+        if self.t - self.last_scan >= self.scan_every:
+            self._scan()
+        N_meas = N + (self.np_random.normal(0, self.blood_noise) if self.blood_noise > 0 else 0.0)
+        return np.array([
+            self.scanned_logT / 3.0,
+            N_meas,
+            (self.t - self.last_scan) / self.scan_every,
+            self.t / self.horizon,
+            self.prev_dose / self.doses.max(),
+        ], dtype=np.float32)
 
     # ---------- gym API ----------
     def reset(self, seed=None, options=None):
@@ -100,10 +139,14 @@ class ChemoEnv(gym.Env):
                 self.p[k] *= self.np_random.uniform(1 - self.var, 1 + self.var)
         self.state = np.array([self.T0, 1.0, 0.0])
         self.t = 0
+        self.prev_dose = 0.0
+        if self.partial:
+            self._scan()
         return self._obs(), {"params": self.p}
 
     def step(self, action):
         u = self.doses[int(action)]
+        self.prev_dose = u
         T_prev = self.state[0]
         self._integrate_day(u)
         self.t += 1

@@ -1,0 +1,1 @@
+E2: 261/300 test patients (87.0%) are cured by at least one rule in the family

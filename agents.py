@@ -3,6 +3,7 @@ import json
 
 from stable_baselines3 import DQN, PPO
 from stable_baselines3.common.env_util import make_vec_env
+from gymnasium.wrappers import FrameStackObservation
 from stable_baselines3.common.monitor import Monitor
 
 from chemo_env import ChemoEnv
@@ -25,16 +26,24 @@ def load_config(algo, path=None):
     return cfg
 
 
-def make_model(algo, cfg, seed, env_kwargs, monitor_dir=None):
+def make_env(env_kwargs, hist=0):
+    """A single evaluation env; with hist>0 the last `hist` observations are stacked."""
+    env = ChemoEnv(**env_kwargs)
+    return FrameStackObservation(env, stack_size=hist) if hist else env
+
+
+def make_model(algo, cfg, seed, env_kwargs, monitor_dir=None, hist=0):
     cfg = dict(cfg)
     policy_kwargs = dict(net_arch=NETS[cfg.pop("net")])
+    wrapper = (lambda e: FrameStackObservation(e, stack_size=hist)) if hist else None
     if algo == "PPO":
         env = make_vec_env(ChemoEnv, n_envs=8, seed=seed, env_kwargs=env_kwargs,
-                           monitor_dir=monitor_dir)
+                           monitor_dir=monitor_dir, wrapper_class=wrapper)
         return PPO("MlpPolicy", env, seed=seed, verbose=0, device="cpu",
                    policy_kwargs=policy_kwargs, **cfg)
     env = ChemoEnv(**env_kwargs)
     env = Monitor(env, monitor_dir) if monitor_dir else env
+    env = wrapper(env) if hist else env
     env.reset(seed=seed)
     return DQN("MlpPolicy", env, buffer_size=100_000, learning_starts=5_000, seed=seed,
                verbose=0, device="cpu", policy_kwargs=policy_kwargs, **cfg)

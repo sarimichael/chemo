@@ -33,7 +33,8 @@ BASELINES = {
 
 def run_policy(env, policy, seed=None, sb3_model=None):
     obs, info = env.reset(seed=seed)
-    traj = {"T": [env.state[0]], "N": [env.state[1]], "C": [env.state[2]], "dose": []}
+    st = env.unwrapped.state
+    traj = {"T": [st[0]], "N": [st[1]], "C": [st[2]], "dose": []}
     total, t, done = 0.0, 0, False
     while not done:
         if sb3_model is not None:

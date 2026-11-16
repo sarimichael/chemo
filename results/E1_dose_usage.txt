@@ -1,0 +1,4 @@
+dose usage on 300 E1 test patients (share of treatment days)
+PPO   none 0.41  low 0.39  high 0.20
+DQN   none 0.46  low 0.25  high 0.29
+QL    none 0.41  low 0.42  high 0.17
