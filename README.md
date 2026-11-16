@@ -2,6 +2,8 @@
 
 Final project, Introduction to Reinforcement Learning course.
 
+**📄 [Full report (PDF)](docs/report.pdf) · 📊 [Presentation slides (PDF)](docs/slides.pdf)**
+
 An RL agent chooses a daily chemotherapy dose for a simulated patient. It must
 eradicate the tumor without letting healthy cells drop below a toxicity limit.
 Patients differ: every episode draws new model parameters, so a fixed schedule
