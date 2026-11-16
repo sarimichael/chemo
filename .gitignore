@@ -1,0 +1,6 @@
+__pycache__/
+*.log
+logs/
+models/
+prototype/
+tuning/*.db
