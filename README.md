@@ -71,7 +71,7 @@ dC/dt = u − γ·C
 
 ```bash
 pip install -r requirements.txt
-bash run_all.sh          # ~1.5 h on a 2-core CPU, no GPU needed
+bash run_all.sh          # about 2 h on a 2-core CPU, no GPU needed
 ```
 
 Single steps:
